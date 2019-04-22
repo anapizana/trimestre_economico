@@ -1,0 +1,364 @@
+---
+title: 'En busca del cadáver del neoliberalismo: 14 años del Trimestre Económico'
+author: "Milena Enss y Manuel Toral"
+date: "March 4, 2019"
+output:
+  html_document: default
+  pdf_document: default
+  word_document: default
+---
+
+ 
+ > A pesar de estos treinta o treinta y tantos años que lleva de ser manejada de manera neoliberal y de publicar casi exclusivamente pensamiento neoliberal, es la revista económica en español con más prestigio en el mundo... Julio Boltvinik.
+
+
+El cambio en la icónica revista *Trimestre Económico* parece haber sido una más de esas decisiones que funcionarios del gobierno en turno toman con una pesada carga ideológica. El director de el *Fondo de Cultura Económica* lo reconoce sin empacho: "*Hasta ahora*, en los últimos años, *el Trimestre* había sido un portador del proyecto neolibreral, para nosotros el proyecto neoliberal es un cadáver del que tenemos que deshacernos lo más rápido posible." [^1] Aunado a lo anterior, y por si quedara duda de la naturaleza de este cambio, Julio Boltvinik, un recientemente nombrado miembro del nuevo Directorio de la revista, afirmó que "lo que está a la derecha [del keynesianismo] es neoliberalismo, y eso en principio no lo vamos a publicar, excepto para debatirlo." Lejos de la verdad de perogrullo que las decisiones de políticas públicas también son decisiones ideológicas, resulta interesante observar una clara afronta de ruptura y queda evaluar si esta tiene como víctima el rigor de una publicación del nivel de *El Trimestre Económico*.
+
+En el más [reciente número](http://www.eltrimestreeconomico.com.mx/index.php/te/issue/view/68) de la revista (*Vol. 86, Núm. 342 (2019)*), el Consejo Directivo publica una breve reseña hitórica de la revista. En ella, dedica la mayor parte del texto a decribir el giro teórico de la revista en consonancia con lo que los autores denominan "el inicio de la política liberal", cuyo principal repsonsable fue el entonces director de la revista, el Dr. Carlos Bazdresch. Los autores añaden que el proceso de publicación promovido por Bazdresch, basado en la idea de que prevalecieran los criterios científicos, no tenían ningún lineamiento editorial.
+
+Ante este panorama, de menos confuso, es pertinente una pregunta: ¿dónde está ese cadáver que lo que Taibo II llama el neoliberalismo?, ¿de verdad el *Trimestre* era este ["nido de neoliberales *autistas*"](https://www.youtube.com/watch?v=Bk9lkp6Xqbs]), como diría Boltvinik?
+
+Para resolver estas dudas, es posible recolectar toda la información contenida en su sitio web desde 2015 hasta 2019 y organizarla de manera estructurada para poder analizar, entre muchas otras cosas, los temas más comunes, el origen de sus autoras y autores más recurrentes en incluso los métodos usados. Un artículo que, con base en una muestra mucho más diversa de revistas y más amplia en términos temporales, inspira la persecución de esta estrategia es ["El estatus de la ciencia económica en México"](http://www.eltrimestreeconomico.com.mx/index.php/te/article/view/771/1025) de Campos Vázquez y López Araiza (2018).
+
+# La muestra
+
+La muestra disponible en el sitio web del *Trimestre Económico* se compone de 454 artículos publicados en la revista de 2005 a 2019. Estos artículos fueron elaborados por 748 autores de 27 países. 
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message =FALSE, warning =  FALSE)
+```
+
+```{r librerias}
+library(tidyverse)
+library(stringr)
+library(Cairo) # Para usar TODAS las fuentes.
+library(sf)
+library(widyr)
+library(igraph)
+library(ggraph)
+
+library(hrbrthemes) # Para usar los themes de HRBR.
+
+extrafont::loadfonts()
+library(treemap)
+library(tidytext)
+library(wordcloud)
+library(ggalt)
+library(wesanderson)
+```
+
+```{r base}
+trimestre <- read_csv("base_limpia.csv")
+```
+
+```{r obtener years}
+trimestre$yr <- 
+as.character(regmatches(trimestre$p_numero, 
+                        gregexpr("(?<=\\().*?(?=\\))", 
+                                 trimestre$p_numero, perl=T)))
+```
+
+## ¿De dónde vienen los artículos de *El Trimestre Económico*?
+
+Quizás es posible identificar el supuesto sesgo en las publicaciones de *El Trimestre* con base en las instituciones a las que están afiliados sus autoras y autores.
+
+La universidad (o institución) que más ha publicado en esta muestra de artículos de la revista es el *Centro de Investigación y Docencia Económicas* con 47 artículos, misma institución que dirigió Carlos Bazdresch de 1989 a 1994, seguida de la Universidad de Chile con 45 y del Banco de México con 42. El Colegio de México, la Pontifica Universidad de Chile, el Tecnológico de Monterrey y la Universidad de Zaragoza forman tamién parte del grupo de instituciones cuyo personal ha publicado más de 20 artículos. 
+
+De las 20 instituciones cuyos afiliados y afiliadas han publicado más artículos, 14 son instituciones públicas.
+
+```{r origen universidad, fig.height=8, fig.width=12}
+pal <- wesanderson::wes_palette("Zissou1", 8, "continuous")
+
+trimestre %>% 
+  count(Universidad) %>% 
+  arrange(-n) %>% 
+  head(20) %>% 
+  ggplot(aes(x=reorder(Universidad, n), y=n,
+             label=n, fill=n)) +
+  geom_col() +
+  labs(title = "Las 20 instituciones de afiliación",
+       subtitle="que más han publicado en 'El Trimestre Económico'",
+       x="Institución", y="Número",
+       caption = "Elaboración propia con datos de 'El Trimestre Económico'.") +
+  theme_ipsum(grid="X") +
+  coord_flip()+
+  scale_fill_gradientn("Número",colors=pal)+
+  # theme(axis.text.x = element_text(angle=45, hjust=1)) 
+  geom_text(hjust=-0.5) +
+  guides(fill=FALSE)
+
+ggsave("afiliacion.png", height=8, width=12)
+```
+
+## Los autores que más han publicado
+
+En promedio cada autora o autor publica 1.15 artículos. Sólo 95 personas participan o han escrito un artículo en más de una ocasión de una muestra de 748. La siguiente tabla presenta los 15 autores y autoras que más han publicafo en la revista.
+
+```{r}
+trimestre %>% 
+  separate(p_kwordsalt, 
+           c("clave_1","clave_2","clave_3","clave_4",
+             "clave_5","clave_6","clave_7","clave_8"), 
+           sep=";") %>% 
+  mutate(autor = paste(p_nombre, p_apellido)) %>% 
+  mutate(autor = gsub("Miguel Székely Pardo","Miguel Székely", autor)) %>% 
+  mutate(autor = gsub("Luis I. Jácome H.","Luis I. Jácome", autor)) %>% 
+  mutate(autor = gsub("Raymundo M. Campos-Vázquez",
+                      "Raymundo M. Campos Vázquez", autor)) %>% 
+  mutate(autor = gsub("-"," ", autor))-> trimestre
+  
+trimestre %>% 
+  count(Nombre= autor, Institución=Universidad) %>% 
+  arrange(-n) %>% 
+  rename(`Número de Artículos` = n) %>% 
+  head(15) %>% 
+  knitr::kable()
+```
+
+
+## Artículos por sexo de la autora o autor
+
+La diferencia entre autores o autoras es muy grande. Mientras que 732 de los autores son hombres, solamente 190 son mujeres. Es decir, hay casi 4 veces más hombres que mujeres.
+
+```{r sexo, fig.height=6, fig.width=8}
+
+trimestre %>% 
+  count(Sexo) %>% 
+  na.omit() %>%  #Un sólo Missing Value para ua publicación de varios autorxs.
+  ggplot(aes(x=as.factor(Sexo), y=n,
+             label=n, fill=as.factor(Sexo))) +
+  geom_col() +
+  labs(title = "Número de autoras y autores de El Trimestre",
+       subtitle="por sexo",
+       x="Sexo", y="Número",
+       caption = "Elaboración propia con datos de 'El Trimestre Económico'.") +
+  theme_ipsum(grid="Y") +
+  scale_fill_manual(values= c("#E8C31E", "#F21A00")) +
+  scale_x_discrete(labels =c("Hombre", "Mujer")) +
+  geom_text(vjust=-0.5) +
+  guides(fill=FALSE)
+
+ggsave("sexo.png", height=6, width=8)
+```
+
+Si bien esta situación ha mejorado con los años, en 2015 incluso se alcanzó la paridad de género en cuanto a autoras. Sin embargo, en años posteriores no se ha alcanzado ese equilibrio. Un cambio interesante en el nuevo número de *El Trimestre* que prepara su nuevo Directorio, sería el de promover la participación de mujeres en la publicación.
+
+```{r sexoyr, fig.height=6, fig.width=8}
+trimestre %>% 
+  count(yr, Sexo) %>% 
+  na.omit() %>% 
+  spread(Sexo, n) %>% 
+  mutate(prop = `1`/`0`) %>% 
+  mutate(yr =  recode(yr, "2019" = "2019*")) %>% 
+  ggplot(aes(yr, prop, group=1, 
+             label=paste0(round(prop*100), "%"), 
+             fill=prop)) +
+  geom_col() +
+  theme_ipsum(grid="Y") +
+  scale_fill_gradientn("Número",colors=pal)+
+  scale_y_percent(labels = scales::percent_format(accuracy = 2),
+                  limits = c(0,.55)) +
+  # theme(axis.text.x = element_text(angle=45, hjust=1)) 
+  geom_text(vjust=-0.5) +
+  guides(fill=FALSE) +
+  labs(title = "Proporción de mujeres autoras en 'El Trimestre Económico'",
+       subtitle="por año, con respecto al número total de autores",
+       x= "Año", y="Porcentaje de Mujeres",
+       caption="Elaboración propia con datos de 'El Trimestre Económico'.\n*El año 2019 comprende sólo dos números de la revista.")
+
+ggsave("sexoyr.png", height=6, width=8)
+```
+
+## Países de origen de las instituciones
+
+Los países de origen de las univesidades o instituciones a la que las autoras y autores de la revista pertenecen nos permite observar la diversidad de geografías desde donde las que se contribuye a la revista. El país con más publicaciones es México, lugar de edición de la revista, con 278 autoras y autores, seguido de Chile, España y Estados Unidos con 145, 138 y 73 respectivamente. En quinto lugar se encuentra Argentina (34), en sexto Colombia (24), en séptimo Uruguay (18) y en octavo Perú, Reino Unido y Venezuela con 8 cada uno. También aparecen contribuciones de países como Canadá, Alemania, Corea, Portugal, entre otros.
+
+```{r paises,  fig.width=10}
+
+trimestre %>% 
+  distinct(autor, Pais) %>% 
+  count(PAIS =Pais) %>% 
+  arrange(-n) -> porpais
+
+file <- "shp_mapa_paises_mundo_2014/Mapa_paises_mundo.shp"
+
+map <- st_read(file, quiet=TRUE, options = "ENCODING=LATIN1") %>% 
+  mutate(PAIS = recode(PAIS, 
+                       "Méjico" = "México",
+                       "Corea, República de" = "Corea")) %>% 
+  filter(!PAIS == "Antártida")
+  
+#mapdb <- as.tibble(map) %>% select(PAIS, COUNTRY)
+
+joined_map_d <- left_join(map, porpais)
+
+
+joined_map_d %>% 
+  lwgeom::st_transform_proj(crs = "+proj=wintri") %>% 
+  ggplot() +
+  geom_sf(aes(fill=n),
+          color="transparent") +
+  viridis::scale_fill_viridis(discrete = F, option = "D",
+                              name="Número",
+                              limits = c(0,300), breaks = c(0, 50, 100, 
+                                                            150, 200, 250,300)) +
+  coord_sf(datum = NA) +
+  hrbrthemes::theme_ipsum()+
+  theme(line = element_blank(),
+        axis.text = element_blank(),
+        axis.title = element_blank(),
+        panel.background = element_blank())  +
+  labs(title="Número de autoras o autores en 'El Trimeste' por país",
+       subtitle="según origen de institución de afiliación",
+       caption = "Elaboración propia con datos de 'El Trimestre Económico'.") 
+
+ggsave("mapa.png", height=8, width=10)
+  
+```
+
+
+## Los temas más recurrentes
+
+Para obetener los temas más recurrentes, es posible analizar dos fuentes de información. La primera es la frecuencia relativa de palabras clave, un método común de clasificación en todos los artículos de la revista. La segunda es el análisis de los resúmenes de cada artículo a partir de herramientas de minería de texto.
+
+Con 43 menciones, *México* es la palabra más mencionada entre las palabras clave, seguida con 28 menciones de *crecimiento económico*, *pobreza* con 18, *América Latina* con 15, *inflación* con 14. Palabras como *desigualdad*, *productividad* y *telecomunicaciones* aparecen 10 veces cada una.
+
+
+```{r}
+trimestre %>% 
+  mutate(p_titulo = str_remove_all(p_titulo, "[\t\n]")) %>% 
+  mutate(p_abstract = str_trim(p_abstract)) %>%
+  mutate(p_abstract = str_squish(p_abstract)) %>%
+  mutate(p_abstract = str_replace_all(p_abstract, ":", " " ))%>% 
+  mutate(p_abstract = str_replace_all(p_abstract, "Antecedentes|Metodología|Conclusiones", " " ))  -> trimestre
+```
+
+```{r dev="cairo_pdf"}
+trimestre %>%
+  select(p_titulo, clave_1:clave_8) %>% 
+  distinct(p_titulo,.keep_all = TRUE) %>% 
+  gather(variable, value,-p_titulo) %>% 
+  na.omit(value) %>% 
+  mutate(value = gsub("\\.","", value)) %>% 
+  mutate(value = gsub("Mexico","México", value)) %>%
+  mutate(value = str_trim(value)) %>%
+  count(value) %>% 
+  arrange(-n) %>% 
+  filter(n>2) %>% 
+  mutate(label = 
+           paste(value, 
+                  n, 
+                  sep="\n"))-> kw
+
+```
+
+```{r, include=FALSE, results="hide", eval=FALSE}
+png("tree1.png", width = 800, height = 600)
+treemap(kw,
+        index="label",
+        vSize="n",
+        vColor="n",
+        type="value", 
+        palette = "-Spectral", 
+        title="Palabras claves más usadas en 'El Trimestre Económico'",
+        mapping = c(5,25,45))
+dev.off()
+```
+
+![](tree1.png)
+
+
+Los resúmenes de cada artículo pueden dar una visión más completa de los temas más tratados. La siguiente visualización, a modo de nube de palabras, permite observar los conceptos más comunes en la descripción corta de los artículos de la muestra.
+
+
+```{r dev="cairo_pdf", fig.height=20, fig.width=20, results="hide", eval=FALSE}
+custom_stop_words <- bind_rows(stop_words,
+                      tibble(word = tm::stopwords("spanish"),
+                       lexicon = "custom"))
+
+png("w1.png", width = 800, height = 800)
+trimestre %>% 
+  distinct(p_abstract) %>% 
+  unnest_tokens(word, p_abstract) %>% 
+  anti_join(custom_stop_words ) %>%
+  filter(!word %in% c("artículo", "dos", "sin","embargo", "así", "si", "ser", "resultados",seq(2000,2019,1),"además","cómo","ii","años")) %>% 
+  count(word) %>%
+  with(wordcloud(word, n, max.words = 300,
+                 colors=rev(brewer.pal(14, "Dark2"))))
+
+dev.off()
+```
+
+![](w1.png)
+
+Sin embargo, los conceptos en sí mismos pueden dar una idea muy limitada de los temas más comunes. La siguiente visualización muestra los *bigramas* (conjuntos más frecuentes de dos palabras) más comunes en los resúmenes. Los bigramas más comunes son *largo plazo*, que aparece 134 veces, *américa latina* y *crecimiento económico* con 104 y 103, prespectivamente. A estos últimos, les siguen *política monetaria*, *corto plazo*, *gasto público*, *evidencia empírica* y *clase media* con más de 40 menciones. 
+
+
+```{r dev="cairo_pdf", fig.width=15}
+custom_stop_words <- bind_rows(stop_words,
+                      tibble(word = tm::stopwords("spanish"),
+                       lexicon = "custom"))
+
+trimestre %>% 
+  unnest_tokens(bigram, p_abstract, token="ngrams", n=2) %>%
+  separate(bigram, c("word1", "word2" ), sep = " ") %>%
+  filter(!word1 %in% c(custom_stop_words$word, 
+                       "resultado","resultados", "artículo")) %>%
+  filter(!word2 %in% c(custom_stop_words$word, 
+                       "resultado","resultados","artículo")) %>%
+  count(word1, word2, sort = TRUE) %>%
+  unite(bigram, word1, word2, sep = " ") %>% 
+  head(20) %>% 
+  ggplot(aes(reorder(bigram,n), n, fill=n, label=n)) +
+  geom_col() +
+  coord_flip() +
+  theme_ipsum(grid="X")+
+  ylim(0,140) +
+  labs(x="Palabras", y="Frecuencia", title="Bigramas más usados en abstracts",
+       subtitle="en la revista Trimestre Económico de 2005 a 2019",
+       caption = "Elaboración propia con datos de 'El Trimestre Económico'.") +
+    scale_fill_gradientn("Número",colors=pal) +
+  guides(fill=FALSE) +
+  geom_text(hjust=-.5)
+
+ggsave("bigrams.png", height=15, width=10)
+```
+
+Otra forma de analizar los conceptos y cómo se aglutinan entre sí es creando una red de términos correlacionados. La siguiente visualización permite observar tres grandes regiones. Del lado superior derecho del círculo, es posible observar varios estudios sobre brechas salariales entre géneros. Un poco más abajo, es posible observar una región de artículos relacionados con las crisis económicas y otros con la política monetaria y sus consecuencias. Una cuarta región se puede identificar, en el plano inferior derecho, de artículos dedicados a al educación. Finalmente, del lado inferior izquierdo es posible ver una gran congregación de artículos dedicados al libre comercio y al estudio del Tratado de Libre Comercio con América del Norte.
+
+```{r red, fig.width=10, fig.height=10}
+trimestre %>% 
+  distinct(p_titulo, text=p_abstract) %>% 
+  select(p_titulo, text) %>% 
+  rowid_to_column() %>% 
+  unnest_tokens(word, text) %>% 
+  anti_join(custom_stop_words ) %>%
+  filter(!word %in% c("artículo", "dos", "sin","embargo", "así", "si", "ser", "resultados",seq(2000,2019,1),"además","cómo","ii","años", "antecedenteslas", "sólo",
+                      "sino")) %>%
+  group_by(word) %>%
+  filter(n() >= 20) %>%
+  pairwise_cor(word, p_titulo, sort = TRUE) -> cors
+
+cors %>% 
+  filter(correlation > .30) %>%
+  graph_from_data_frame() %>%
+  ggraph(layout = "fr") +
+  geom_edge_link(aes(edge_alpha = correlation, edge_width = correlation/6), 
+                 show.legend = FALSE, edge_colour = "lightblue") +
+  geom_node_point(color = "darkblue", size = 3) +
+  geom_node_text(aes(label = name), repel = TRUE) +
+  theme_void()
+
+ggsave("red.png", height=10, width=10)
+```
+
+
+# Prospectiva
+
+
+
+No todo son malas noticias. Ante nuestros registros y análisis queda una oportunidad única para ver los efectos de un liderazgo abiertamente militante en un medio de producción del conocimiento. Queda ver si este proyecto que pretende destruir el andamiaje de una supuesta hegemonía del pensamiento neoliberal (de economía *autista*, diría Julio Boltvinik), puede estar a al altura de la historia que esta publicación tiene.
+
+[^1]:Las comillas son mías.
+
